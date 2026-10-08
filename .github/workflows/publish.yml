@@ -1,0 +1,41 @@
+# Publishes a release from the files pushed to the "publish" branch.
+# The branch holds: release.json  {"version": "1.58.0", "title": "...", "latest": true}
+#                   notes.md       (the release notes)
+#                   files/         (the downloads; a file split as NAME.part1, NAME.part2, … is joined first)
+# The branch is replaced on every publish, so the downloads never pile up in the history.
+name: Publish release
+on:
+  push:
+    branches: [publish]
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: publish
+      - name: Join split files
+        run: |
+          cd files
+          for first in *.part1; do
+            [ -e "$first" ] || continue
+            base="${first%.part1}"
+            ls "$base".part* | sort -V | xargs cat > "$base"
+            rm "$base".part*
+          done
+          if [ -f SHA256SUMS ]; then sha256sum -c SHA256SUMS; fi
+          ls -la
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(jq -r .version release.json)
+          TITLE=$(jq -r '.title // ("Writing Desk " + .version)' release.json)
+          if gh release view "v$VER" >/dev/null 2>&1; then
+            gh release upload "v$VER" files/* --clobber
+            gh release edit "v$VER" --title "$TITLE" --notes-file notes.md --latest
+          else
+            gh release create "v$VER" files/* --target main --title "$TITLE" --notes-file notes.md --latest
+          fi
