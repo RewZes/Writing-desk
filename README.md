@@ -1,5 +1,4 @@
 # Writing Desk
-\nNote and book writing app — vibe coded, made for writing on PC and phone.
 
 A writing app for notes and books — on Windows and Android, kept in sync between them.
 
